@@ -1,0 +1,26 @@
+# Qt
+build/
+debug/
+release/
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.autosave
+
+# C++
+*.o
+*.obj
+*.exe
+*.dll
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+
+# VSCode
+.vscode/
+
+# Windows
+Thumbs.db
