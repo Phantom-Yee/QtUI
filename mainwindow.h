@@ -7,24 +7,9 @@
 #include <QPointF>
 #include <QVector>
 #include <QWidget>
-
-// ================= 用于图形可视化的自定义控件类 =================
-class MapWidget : public QWidget
-{
-    Q_OBJECT
-public:
-    explicit MapWidget(QWidget *parent = nullptr);
-    void setPoints(const QVector<QPointF>& points);             // 设置边界点
-    void setTrajectory(const QVector<QPointF>& trajectory);     // 设置轨迹点并重绘
-
-protected:
-    void paintEvent(QPaintEvent *event) override;
-
-private:
-    QVector<QPointF> m_points;          // 边界
-    QVector<QPointF> m_trajectory;      // 轨迹
-};
-// =====================================================================
+#include <QTextEdit>
+#include <QMenu>
+#include <QAction>
 
 class MainWindow : public QMainWindow
 {
@@ -38,20 +23,27 @@ private slots:
     void onSelectBoundaryClicked();
     void onGenerateClicked();
     void onSaveClicked();
+    void onHelpTriggered();
+    void onAboutTriggered();
 
 private:
-    QPushButton *btnSelectBoundary;
-    QPushButton *btnGenerate;
-    QPushButton *btnSave;
+    QMenu *menuFile;
+    QMenu *menuHelp;
+    QAction *actionOpenBoundary;
+    QAction *actionGenerate;
+    QAction *actionSave;
+    QAction *actionExit;
+    QAction *actionHelp;
+    QAction *actionAbout;
 
-    MapWidget *mapWidgetBoundary;      // 左侧绘图控件
-    MapWidget *mapWidgetTrajectory;    // 右侧绘图控件 (原先的QTextEdit已替换)
+    QTextEdit *txtBoundary;
+    QTextEdit *txtTrajectory;
 
     QLabel *lblBoundary;
     QLabel *lblTrajectory;
 
     QVector<QPointF> m_boundaryPoints;
-    QVector<QPointF> m_trajectoryPoints; // 存储生成的轨迹点，用于保存
+    QVector<QPointF> m_trajectoryPoints;
 
     void setupUI();
     bool isConvexPolygon(const QVector<QPointF>& points);

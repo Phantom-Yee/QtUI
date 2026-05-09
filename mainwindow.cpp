@@ -7,107 +7,16 @@
 #include <QTextStream>
 #include <QFile>
 #include <QStringList>
-#include <QPainter>
-#include <QPen>
 #include <cmath>
 #include <algorithm>
 #include <limits>
 #include <QDebug>
+#include <QMenuBar>
 
 // ===== 固定起点（来自 gnss_gridmap.launch 的 start_pose）=====
 static const QPointF kStartPoseXY(0.0, 0.0);
 // yaw = 150° -> 转成弧度
 static const double kStartYawRad = 150.0 * M_PI / 180.0;
-
-// ================== MapWidget 可视化控件的实现 ==================
-MapWidget::MapWidget(QWidget *parent) : QWidget(parent)
-{
-    this->setStyleSheet("background-color: white; border: 1px solid #759BCA;");
-}
-
-void MapWidget::setPoints(const QVector<QPointF>& points)
-{
-    m_points = points;
-    m_trajectory.clear();
-    this->update();
-}
-
-void MapWidget::setTrajectory(const QVector<QPointF>& trajectory)
-{
-    m_trajectory = trajectory;
-    this->update();
-}
-
-void MapWidget::paintEvent(QPaintEvent *event)
-{
-    QWidget::paintEvent(event);
-    if (m_points.isEmpty()) return;
-
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-
-    double minX = m_points[0].x(), maxX = m_points[0].x();
-    double minY = m_points[0].y(), maxY = m_points[0].y();
-
-    for (const QPointF& pt : m_points) {
-        if (pt.x() < minX) minX = pt.x();
-        if (pt.x() > maxX) maxX = pt.x();
-        if (pt.y() < minY) minY = pt.y();
-        if (pt.y() > maxY) maxY = pt.y();
-    }
-
-    double padding = 40.0;
-    double drawWidth = this->width() - 2 * padding;
-    double drawHeight = this->height() - 2 * padding;
-
-    double diffX = maxX - minX;
-    double diffY = maxY - minY;
-    if (diffX == 0) diffX = 0.000001;
-    if (diffY == 0) diffY = 0.000001;
-
-    double scale = std::min(drawWidth / diffX, drawHeight / diffY);
-    double shapeWidth = diffX * scale;
-    double shapeHeight = diffY * scale;
-    double offsetX = (this->width() - shapeWidth) / 2.0;
-    double offsetY = (this->height() - shapeHeight) / 2.0;
-
-    auto toScreen = [&](const QPointF& pt) {
-        double screenX = offsetX + (pt.x() - minX) * scale;
-        double screenY = this->height() - offsetY - (pt.y() - minY) * scale;
-        return QPointF(screenX, screenY);
-    };
-
-    // 绘制边界
-    QVector<QPointF> screenBoundary;
-    for (const QPointF& pt : m_points) {
-        screenBoundary.append(toScreen(pt));
-    }
-
-    painter.setPen(QPen(Qt::blue, 2));
-    if (screenBoundary.size() >= 3) {
-        painter.drawPolygon(QPolygonF(screenBoundary));
-    } else {
-        painter.drawPolyline(QPolygonF(screenBoundary));
-    }
-
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(Qt::red);
-    for (const QPointF& pt : screenBoundary) {
-        painter.drawEllipse(pt, 5, 5);
-    }
-
-    // 绘制绿色轨迹
-    if (!m_trajectory.isEmpty()) {
-        QVector<QPointF> screenTrajectory;
-        for (const QPointF& pt : m_trajectory) {
-            screenTrajectory.append(toScreen(pt));
-        }
-        painter.setPen(QPen(Qt::green, 1.5));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawPolyline(QPolygonF(screenTrajectory));
-    }
-}
-// ===============================================================
 
 QPointF latlonToXY(double lon, double lat, double lon0, double lat0)
 {
@@ -617,14 +526,32 @@ void MainWindow::setupUI()
     QWidget *centralWidget = new QWidget(this);
     this->setCentralWidget(centralWidget);
 
-    btnSelectBoundary = new QPushButton("选择边界", this);
-    btnGenerate = new QPushButton("生成", this);
-    btnSave = new QPushButton("保存", this);
+    menuFile = menuBar()->addMenu("文件(&Y)");
+    menuHelp = menuBar()->addMenu("帮助(&Z)");
 
-    QString btnStyle = "QPushButton { background-color: #4A78D0; color: white; padding: 5px; border: 1px solid #333; }";
-    btnSelectBoundary->setStyleSheet(btnStyle);
-    btnGenerate->setStyleSheet(btnStyle);
-    btnSave->setStyleSheet(btnStyle);
+    actionOpenBoundary = new QAction("打开边界点(&X)", this);
+    actionGenerate     = new QAction("生成轨迹(&Y)", this);
+    actionSave         = new QAction("保存(&S)", this);
+    actionExit         = new QAction("关闭(&Z)", this);
+
+    actionHelp  = new QAction("帮助", this);
+    actionAbout = new QAction("关于", this);
+
+    menuFile->addAction(actionOpenBoundary);
+    menuFile->addAction(actionGenerate);
+    menuFile->addAction(actionSave);
+    menuFile->addSeparator();
+    menuFile->addAction(actionExit);
+
+    menuHelp->addAction(actionHelp);
+    menuHelp->addAction(actionAbout);
+
+    connect(actionOpenBoundary, &QAction::triggered, this, &MainWindow::onSelectBoundaryClicked);
+    connect(actionGenerate,     &QAction::triggered, this, &MainWindow::onGenerateClicked);
+    connect(actionSave,         &QAction::triggered, this, &MainWindow::onSaveClicked);
+    connect(actionExit,         &QAction::triggered, this, &QWidget::close);
+    connect(actionHelp,         &QAction::triggered, this, &MainWindow::onHelpTriggered);
+    connect(actionAbout,        &QAction::triggered, this, &MainWindow::onAboutTriggered);
 
     lblBoundary = new QLabel("边界点", this);
     lblBoundary->setStyleSheet("color: red; border: 1px solid #333; padding: 2px;");
@@ -634,35 +561,19 @@ void MainWindow::setupUI()
     lblTrajectory->setStyleSheet("color: red; border: 1px solid #333; padding: 2px;");
     lblTrajectory->setAlignment(Qt::AlignCenter);
 
-    mapWidgetBoundary = new MapWidget(this);
-    mapWidgetTrajectory = new MapWidget(this);
-
-    mapWidgetBoundary->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    mapWidgetTrajectory->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    txtBoundary = new QTextEdit(this);
+    txtTrajectory = new QTextEdit(this);
+    txtBoundary->setReadOnly(true);
+    txtTrajectory->setReadOnly(true);
 
     QGridLayout *mainLayout = new QGridLayout(centralWidget);
-
-    QVBoxLayout *rightBtnLayout = new QVBoxLayout();
-    rightBtnLayout->addWidget(btnGenerate);
-    rightBtnLayout->addWidget(btnSave);
-
-    QHBoxLayout *topLayout = new QHBoxLayout();
-    topLayout->addWidget(btnSelectBoundary);
-    topLayout->addLayout(rightBtnLayout);
-    topLayout->addStretch();
-
-    mainLayout->addLayout(topLayout, 0, 0, 1, 2);
-    mainLayout->addWidget(lblBoundary, 1, 0, Qt::AlignLeft);
-    mainLayout->addWidget(lblTrajectory, 1, 1, Qt::AlignLeft);
-    mainLayout->addWidget(mapWidgetBoundary, 2, 0);
-    mainLayout->addWidget(mapWidgetTrajectory, 2, 1);
+    mainLayout->addWidget(lblBoundary, 0, 0);
+    mainLayout->addWidget(lblTrajectory, 0, 1);
+    mainLayout->addWidget(txtBoundary, 1, 0);
+    mainLayout->addWidget(txtTrajectory, 1, 1);
 
     mainLayout->setColumnStretch(0, 1);
     mainLayout->setColumnStretch(1, 1);
-
-    connect(btnSelectBoundary, &QPushButton::clicked, this, &MainWindow::onSelectBoundaryClicked);
-    connect(btnGenerate, &QPushButton::clicked, this, &MainWindow::onGenerateClicked);
-    connect(btnSave, &QPushButton::clicked, this, &MainWindow::onSaveClicked);
 }
 
 void MainWindow::onSelectBoundaryClicked()
@@ -694,8 +605,12 @@ void MainWindow::onSelectBoundaryClicked()
         }
     }
 
-    mapWidgetBoundary->setPoints(m_boundaryPoints);
-    mapWidgetTrajectory->setPoints(QVector<QPointF>());
+    QStringList boundaryLines;
+    for (const auto& p : m_boundaryPoints) {
+        boundaryLines << QString::number(p.x(), 'f', 7) + ", " + QString::number(p.y(), 'f', 7);
+    }
+    txtBoundary->setPlainText(boundaryLines.join("\n"));
+    txtTrajectory->clear();
     m_trajectoryPoints.clear();
 }
 
@@ -761,7 +676,7 @@ QVector<QPointF> MainWindow::generateTrajectory(const QVector<QPointF>& metricPo
 
 void MainWindow::onGenerateClicked()
 {
-    mapWidgetTrajectory->setTrajectory(QVector<QPointF>());
+    txtTrajectory->clear();
     m_trajectoryPoints.clear();
 
     if (m_boundaryPoints.size() < 3) {
@@ -787,9 +702,11 @@ void MainWindow::onGenerateClicked()
     // ===== 2) 用米坐标生成轨迹 =====
     m_trajectoryPoints = generateTrajectory(metricBoundary);
 
-    // ===== 3) Qt 绘图也用米坐标 =====
-    mapWidgetTrajectory->setPoints(metricBoundary);
-    mapWidgetTrajectory->setTrajectory(m_trajectoryPoints);
+    QStringList trajLines;
+    for (const auto& p : m_trajectoryPoints) {
+        trajLines << QString::number(p.x(), 'f', 7) + ", " + QString::number(p.y(), 'f', 7);
+    }
+    txtTrajectory->setPlainText(trajLines.join("\n"));
 }
 
 void MainWindow::onSaveClicked()
@@ -815,4 +732,14 @@ void MainWindow::onSaveClicked()
 
     file.close();
     QMessageBox::information(this, "成功", "轨迹已成功保存为txt文件！");
+}
+
+void MainWindow::onHelpTriggered()
+{
+    // 预留接口，不做任何处理
+}
+
+void MainWindow::onAboutTriggered()
+{
+    QMessageBox::information(this, "关于", "覆盖式路径规划与生成桌面版，Version1.0");
 }
