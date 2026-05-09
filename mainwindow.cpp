@@ -29,6 +29,16 @@ QPointF latlonToXY(double lon, double lat, double lon0, double lat0)
     return QPointF(x, y);
 }
 
+QPointF xyToLatlon(double x, double y, double lon0, double lat0)
+{
+    const double R = 6378137.0; // 地球半径
+    double dLat = y / R;
+    double dLon = x / (R * std::cos(lat0 * M_PI / 180.0));
+    double lat = lat0 + dLat * 180.0 / M_PI;
+    double lon = lon0 + dLon * 180.0 / M_PI;
+    return QPointF(lon, lat);
+}
+
 
 // ================== AgriPlanner (基于 version2) ==================
 namespace AgriPlanner {
@@ -700,7 +710,12 @@ void MainWindow::onGenerateClicked()
     }
 
     // ===== 2) 用米坐标生成轨迹 =====
-    m_trajectoryPoints = generateTrajectory(metricBoundary);
+    QVector<QPointF> metricTrajectory = generateTrajectory(metricBoundary);
+
+    // ===== 3) 米坐标 -> 经纬度输出 =====
+    for (const auto& p : metricTrajectory) {
+        m_trajectoryPoints.push_back(xyToLatlon(p.x(), p.y(), lon0, lat0));
+    }
 
     QStringList trajLines;
     for (const auto& p : m_trajectoryPoints) {
