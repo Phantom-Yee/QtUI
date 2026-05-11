@@ -10,6 +10,7 @@
 #include <QTextEdit>
 #include <QMenu>
 #include <QAction>
+#include <QString>
 
 class MainWindow : public QMainWindow
 {
@@ -45,9 +46,11 @@ private:
     QVector<QPointF> m_boundaryPoints;
     QVector<QPointF> m_trajectoryPoints;
 
+    QString m_boundaryFilePath;
+    QString m_outputFilePath;
+
     void setupUI();
-    bool isConvexPolygon(const QVector<QPointF>& points);
-    QVector<QPointF> generateTrajectory(const QVector<QPointF>& boundary);
+    bool loadPointsFromFile(const QString& filePath, QVector<QPointF>& points);
 };
 
 #endif // MAINWINDOW_H
