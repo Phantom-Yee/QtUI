@@ -1,5 +1,5 @@
 #include "mainwindow.h"
-#include "path_planning.h"
+#include "pathplanning.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
